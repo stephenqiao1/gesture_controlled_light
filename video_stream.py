@@ -51,8 +51,11 @@ class landmarker_and_result():
         
 def draw_landmarks_on_image(rgb_image, detection_result: HandLandmarkerResult):
     try:
+        height, width, _ = rgb_image.shape
+        mask = np.zeros((height, width), dtype=np.uint8) # Create a black image for the mask
+        
         if detection_result.hand_landmarks == []:
-            return rgb_image
+            return rgb_image, mask
         else:
             hand_landmarks_list = detection_result.hand_landmarks
             annotated_image = np.copy(rgb_image)
@@ -60,6 +63,15 @@ def draw_landmarks_on_image(rgb_image, detection_result: HandLandmarkerResult):
             # Loop through the detected hands to visualize
             for idx in range(len(hand_landmarks_list)):
                 hand_landmarks = hand_landmarks_list[idx]
+                
+                # Convert normalized landmarks to pixel coordinates
+                pixel_coords = [(int(landmark.x * width), int(landmark.y * height)) for landmark in hand_landmarks]
+                
+                # Create a convex hull around the hand
+                hull = cv2.convexHull(np.array(pixel_coords))
+                
+                # Draw the convex hull on the mask
+                cv2.drawContours(mask, [hull], 0, (255), -1) # Fill the hand region with white
                 
                 # Draw the hand landmarks
                 hand_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
@@ -72,9 +84,9 @@ def draw_landmarks_on_image(rgb_image, detection_result: HandLandmarkerResult):
                     mp.solutions.drawing_styles.get_default_hand_landmarks_style(),
                     mp.solutions.drawing_styles.get_default_hand_connections_style()
                 )
-        return annotated_image
+        return annotated_image, mask
     except:
-        return rgb_image
+        return rgb_image, mask
             
             
     
@@ -96,10 +108,11 @@ def capture_video_stream():
         hand_landmarker.detect_async(frame)
         print(hand_landmarker.result)
         
-        # draw landmarks on frame
-        frame = draw_landmarks_on_image(frame, hand_landmarker.result)
+        # draw landmarks on frame and get the mask
+        frame, mask = draw_landmarks_on_image(frame, hand_landmarker.result)
         
         cv2.imshow('Video Stream', frame)
+        cv2.imshow('Hand Mask', mask)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
