@@ -18,18 +18,21 @@ VisionRunningMode = mp.tasks.vision.RunningMode
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
 
+
 # Create a gesture recognizer class with the live stream mode
 class gesture_and_result:
     def __init__(self):
         self.result = GestureRecognizerResult
         self.gesture = GestureRecognizer
         self.createGesture()
-    
+
     def createGesture(self):
         # callback function
-        def update_result(result: GestureRecognizerResult, output_image: mp.Image, timestamp_ms: int):
+        def update_result(
+            result: GestureRecognizerResult, output_image: mp.Image, timestamp_ms: int
+        ):
             self.result = result
-            
+
         options = GestureRecognizerOptions(
             base_options=BaseOptions(model_asset_path="gesture_recognizer.task"),
             running_mode=VisionRunningMode.LIVE_STREAM,
@@ -39,18 +42,21 @@ class gesture_and_result:
             min_hand_presence_confidence=0.3,
             min_tracking_confidence=0.3,
         )
-        
+
         # initialize gesture
         self.gesture = self.gesture.create_from_options(options)
-        
+
     def recognize_async(self, frame):
         # convert np frame to mp image
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
         # detect gestures
-        self.gesture.recognize_async(image=mp_image, timestamp_ms=int(time.time() * 1000))
-        
+        self.gesture.recognize_async(
+            image=mp_image, timestamp_ms=int(time.time() * 1000)
+        )
+
     def close(self):
         self.gesture.close()
+
 
 class landmarker_and_result:
     def __init__(self):
@@ -60,14 +66,16 @@ class landmarker_and_result:
 
     def createLandmarker(self):
         # callback function
-        def update_result(result: HandLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
+        def update_result(
+            result: HandLandmarkerResult, output_image: mp.Image, timestamp_ms: int
+        ):
             self.result = result
 
         options = HandLandmarkerOptions(
             base_options=BaseOptions(model_asset_path="hand_landmarker.task"),
             running_mode=VisionRunningMode.LIVE_STREAM,
             result_callback=update_result,
-            num_hands=2
+            num_hands=2,
         )
 
         # initialize landmarker
@@ -84,7 +92,7 @@ class landmarker_and_result:
     def close(self):
         # close landmarker
         self.landmarker.close()
-        
+
 
 def create_convex_hull(height, width, hand_landmarks, annotated_image, mask):
     # Convert normalized landmarks to pixel coordinates
@@ -114,7 +122,8 @@ def create_convex_hull(height, width, hand_landmarks, annotated_image, mask):
             # Draw the defects on the image
             cv2.line(annotated_image, start, end, [0, 255, 0], 2)
             cv2.circle(annotated_image, far, 5, [0, 0, 255], -1)
-            
+
+
 def display_gesture_on_image(rgb_image, gesture_result: GestureRecognizerResult):
     try:
         if gesture_result.gestures == []:
@@ -122,12 +131,20 @@ def display_gesture_on_image(rgb_image, gesture_result: GestureRecognizerResult)
         else:
             gesture_list = gesture_result.gestures
             labeled_image = np.copy(rgb_image)
-            
+
             for idx in range(len(gesture_list)):
                 gestures = gesture_list[idx]
-                
-                 # Display the recognized gesture on the image
-                cv2.putText(labeled_image, f"Gesture: {gestures[0].category_name}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+                # Display the recognized gesture on the image
+                cv2.putText(
+                    labeled_image,
+                    f"Gesture: {gestures[0].category_name}",
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (255, 255, 255),
+                    2,
+                )
         return labeled_image
     except:
         return rgb_image
@@ -149,7 +166,7 @@ def draw_landmarks_on_image(rgb_image, detection_result: HandLandmarkerResult):
             # Loop through the detected hands to visualize
             for idx in range(len(hand_landmarks_list)):
                 hand_landmarks = hand_landmarks_list[idx]
-                
+
                 create_convex_hull(height, width, hand_landmarks, annotated_image, mask)
 
                 # Draw the hand landmarks
@@ -173,7 +190,6 @@ def draw_landmarks_on_image(rgb_image, detection_result: HandLandmarkerResult):
     except:
         return rgb_image, mask
 
-
 def capture_video_stream():
     cap = cv2.VideoCapture(0)
 
@@ -183,7 +199,7 @@ def capture_video_stream():
 
     # create landmarker
     hand_landmarker = landmarker_and_result()
-    
+
     # create gestures
     gestures = gesture_and_result()
 
@@ -199,12 +215,18 @@ def capture_video_stream():
 
         # draw landmarks on frame and get the mask
         frame, mask = draw_landmarks_on_image(frame, hand_landmarker.result)
-        
+
         # display gesture labels
         frame = display_gesture_on_image(frame, gestures.result)
 
         cv2.imshow("Video Stream", frame)
         cv2.imshow("Hand Mask with Defects", mask)
+        
+        if gestures.result and gestures.result.gestures:
+            if gestures.result.gestures[0].category_name == "Thumb_Up":
+                control_light(True) # Turn on the light
+            else:
+                control_light(False) # Turn off the light
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
@@ -212,6 +234,22 @@ def capture_video_stream():
     hand_landmarker.close()
     cap.release()
     cv2.destroyAllWindows()
+    
+def control_light(turn_on):
+    try:
+        import RPi.GPIO as GPIO
+
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(17, GPIO.OUT)
+        is_raspberry_pi = True
+    except ImportError:
+        is_raspberry_pi = False
+        
+    if is_raspberry_pi:
+        if turn_on:
+            GPIO.output(17, GPIO.HIGH)
+        else:
+            GPIO.output(17, GPIO.LOW)
 
 
 if __name__ == "__main__":
