@@ -2,8 +2,6 @@ import cv2
 import time
 import numpy as np
 import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
 from mediapipe.framework.formats import landmark_pb2
 
 BaseOptions = mp.tasks.BaseOptions
@@ -17,7 +15,6 @@ VisionRunningMode = mp.tasks.vision.RunningMode
 
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
-
 
 # Create a gesture recognizer class with the live stream mode
 class gesture_and_result:
